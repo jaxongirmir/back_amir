@@ -1,7 +1,21 @@
-import { pgTable, text, serial, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  serial,
+  integer,
+  boolean,
+  jsonb,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+export const sessions = pgTable("user_sessions", {
+  sid: text("sid").primaryKey(),
+  sess: jsonb("sess").notNull(),
+  expire: timestamp("expire").notNull(),
+});
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -103,6 +117,7 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 });
 
 // Type exports
+export type Session = typeof sessions.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 

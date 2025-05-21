@@ -14,7 +14,7 @@ import {
   notifications,
   type Notification,
   type InsertNotification,
-} from "@shared/schema";
+} from "../shared/schema";
 import { db } from "./db";
 import { and, eq } from "drizzle-orm";
 

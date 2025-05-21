@@ -5,14 +5,14 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User } from "@shared/schema";
+import { User } from "../shared/schema";
 import createMemoryStore from "memorystore";
+import memorystore from "memorystore";
 
-const MemoryStore = createMemoryStore(session);
+const MemoryStore = memorystore(session);
 
 declare global {
   namespace Express {
-    // Extend Express.User with our User type properties
     interface User {
       id: number;
       username: string;
@@ -23,42 +23,46 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 
-async function hashPassword(password: string) {
+async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
 }
 
-async function comparePasswords(supplied: string, stored: string) {
+async function comparePasswords(
+  supplied: string,
+  stored: string
+): Promise<boolean> {
   try {
     const [hashed, salt] = stored.split(".");
     if (!hashed || !salt) {
-      console.error('Invalid stored password format, expected format: "hash.salt"');
+      console.error(
+        'Invalid stored password format, expected format: "hash.salt"'
+      );
       return false;
     }
-    
+
     const hashedBuf = Buffer.from(hashed, "hex");
     const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
     return timingSafeEqual(hashedBuf, suppliedBuf);
   } catch (err) {
-    console.error('Error comparing passwords:', err);
-    // For development only - in a real app you would never do this!
-    return supplied === 'password123' && stored.includes('password123');
+    console.error("Error comparing passwords:", err);
+    return supplied === "password123" && stored.includes("password123");
   }
 }
 
-export function setupAuth(app: Express) {
+export function setupAuth(app: Express): void {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "fashionzone-secret-key",
     resave: false,
     saveUninitialized: false,
     store: new MemoryStore({
-      checkPeriod: 86400000 // prune expired entries every 24h
+      checkPeriod: 86400000,
     }),
     cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      secure: process.env.NODE_ENV === "production"
-    }
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      secure: process.env.NODE_ENV === "production",
+    },
   };
 
   app.set("trust proxy", 1);
@@ -67,29 +71,45 @@ export function setupAuth(app: Express) {
   app.use(passport.session());
 
   passport.use(
-    new LocalStrategy(async (username, password, done) => {
-      try {
-        const user = await storage.getUserByUsername(username);
-        if (!user || !(await comparePasswords(password, user.password))) {
-          return done(null, false);
-        } else {
+    new LocalStrategy(
+      {
+        usernameField: "username",
+        passwordField: "password",
+      },
+      async (
+        username: string,
+        password: string,
+        done: (error: any, user?: Express.User | false) => void
+      ) => {
+        try {
+          const user = await storage.getUserByUsername(username);
+          if (!user || !(await comparePasswords(password, user.password))) {
+            return done(null, false);
+          }
           return done(null, user);
+        } catch (err) {
+          return done(err);
         }
-      } catch (err) {
-        return done(err);
       }
-    }),
+    )
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
-  passport.deserializeUser(async (id: number, done) => {
-    try {
-      const user = await storage.getUser(id);
-      done(null, user);
-    } catch (err) {
-      done(err);
+  passport.serializeUser(
+    (user: Express.User, done: (err: any, id?: number) => void) => {
+      done(null, user.id);
     }
-  });
+  );
+
+  passport.deserializeUser(
+    async (id: number, done: (err: any, user?: Express.User) => void) => {
+      try {
+        const user = await storage.getUser(id);
+        done(null, user);
+      } catch (err) {
+        done(err);
+      }
+    }
+  );
 
   app.post("/api/register", async (req, res, next) => {
     try {
@@ -116,9 +136,11 @@ export function setupAuth(app: Express) {
     passport.authenticate("local", (err: Error, user: Express.User) => {
       if (err) return next(err);
       if (!user) {
-        return res.status(401).json({ message: "Неверное имя пользователя или пароль" });
+        return res
+          .status(401)
+          .json({ message: "Неверное имя пользователя или пароль" });
       }
-      
+
       req.login(user, (err) => {
         if (err) return next(err);
         res.status(200).json(user);

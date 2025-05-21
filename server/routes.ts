@@ -2,16 +2,13 @@ import express, { type Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import {
-  insertCartItemSchema,
-  insertFavoriteSchema,
-} from "@shared/schema";
+import { insertCartItemSchema, insertFavoriteSchema } from "../shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
   setupAuth(app);
-  
+
   // API routes
   const apiRouter = express.Router();
 
@@ -91,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      
+
       const userId = req.user!.id;
       const cartItems = await storage.getCartItemWithDetails(userId);
       res.json(cartItems);
@@ -106,7 +103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      
+
       const userId = req.user!.id;
       const cartItemData = { ...req.body, userId };
 
@@ -171,7 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      
+
       const userId = req.user!.id;
       const favorites = await storage.getFavoritesWithDetails(userId);
       res.json(favorites);
@@ -186,7 +183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      
+
       const userId = req.user!.id;
       const favoriteData = { ...req.body, userId };
 
@@ -209,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!req.isAuthenticated()) {
           return res.status(401).json({ message: "Unauthorized" });
         }
-        
+
         const userId = req.user!.id;
         const productId = parseInt(req.params.productId);
         if (isNaN(productId)) {
@@ -218,9 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const success = await storage.removeFromFavorites(userId, productId);
         if (!success) {
-          return res
-            .status(404)
-            .json({ message: "Favorite item not found" });
+          return res.status(404).json({ message: "Favorite item not found" });
         }
 
         res.status(204).end();
